@@ -65,7 +65,7 @@ func (c crawler) crawl() ([]string, error) {
 		log.Fatalf("Erro no setup:%v", err)
 	}
 	log.Printf("Seleção realizada com sucesso!\n")
-	iFname := c.downloadFilePath("indenizatorias")
+	iFname := c.downloadFilePath("verbas-indenizatorias")
 	log.Printf("Fazendo download das indenizações (%s)...", iFname)
 	if err := c.exportaPlanilha(ctx, iFname); err != nil {
 		log.Fatalf("Erro fazendo download dos indenizações: %v", err)
