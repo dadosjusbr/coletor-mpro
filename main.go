@@ -67,7 +67,7 @@ func main() {
 		log.Fatalf("Error crawling (%s, %s, %s): %v", year, month, outputFolder, err)
 	}
 
-	// O parser do CNJ espera os arquivos separados por \n. Mudanças aqui tem
+	// O parser do MPRO espera os arquivos separados por \n. Mudanças aqui tem que
 	// refletir as expectativas lá.
 	fmt.Println(strings.Join(downloads, "\n"))
 }
