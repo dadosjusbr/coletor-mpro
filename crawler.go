@@ -12,7 +12,6 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-
 type crawler struct {
 	collectionTimeout time.Duration
 	timeBetweenSteps  time.Duration
@@ -72,7 +71,6 @@ func (c crawler) crawl() ([]string, error) {
 	}
 	log.Printf("Download realizado com sucesso!\n")
 
-
 	// Retorna caminhos completos dos arquivos baixados.
 	return []string{cqFname, iFname}, nil
 }
@@ -83,16 +81,19 @@ func (c crawler) downloadFilePath(prefix string) string {
 
 func (c crawler) abreCaixaDialogo(ctx context.Context, tipo string) error {
 	var concatenated string
-	if tipo == "contra"{
+	var value string
+	if tipo == "contra" {
 		const (
 			baseURL  = "https://servicos-portal.mpro.mp.br/plcVis/frameset?__report=..%2FROOT%2Frel%2Fcontracheque%2Fmembros%2FremuneracaoMembrosAtivos.rptdesign&anomes="
 			finalURL = "&nome=&cargo=&lotacao="
 		)
+		value = "ELEMENT_1282"
 		concatenated = fmt.Sprintf("%s%s%s%s", baseURL, c.year, c.month, finalURL)
 	} else {
 		const (
-			baseURL  = "https://servicos-portal.mpro.mp.br/plcVis/frameset?__report=..%2FROOT%2Frel%2Fcontracheque%2Fmembros%2FverbasIndenizatoriasMembrosAtivos.rptdesign&anomes="
+			baseURL = "https://servicos-portal.mpro.mp.br/plcVis/frameset?__report=..%2FROOT%2Frel%2Fcontracheque%2Fmembros%2FverbasIndenizatoriasMembrosAtivos.rptdesign&anomes="
 		)
+		value = "ELEMENT_1816"
 		concatenated = fmt.Sprintf("%s%s%s", baseURL, c.year, c.month)
 	}
 
@@ -104,10 +105,14 @@ func (c crawler) abreCaixaDialogo(ctx context.Context, tipo string) error {
 		chromedp.Click(`//*[@title='Exportar dados']`, chromedp.BySearch, chromedp.NodeReady),
 		chromedp.Sleep(c.timeBetweenSteps),
 
-		// Seleciona as colunas
-		chromedp.Click(`/html/body/table/tbody/tr[4]/td[1]/div[1]/div[2]/div/div[1]/table/tbody/tr[5]/td[2]/table/tbody/tr/td/table/tbody/tr[1]/td/input`, chromedp.BySearch, chromedp.NodeVisible),
+		// Seleciona a opção com todos os dados.
+		chromedp.SetValue(`//*[@id="resultsets"]`, value, chromedp.BySearch, chromedp.NodeReady),
 		chromedp.Sleep(c.timeBetweenSteps),
-		
+
+		// Seleciona as colunas
+		chromedp.Click(`//*[@id="simpleExportDialogBody"]/tbody/tr[5]/td[2]/table/tbody/tr/td/table/tbody/tr[1]/td/input`, chromedp.BySearch, chromedp.NodeReady),
+		chromedp.Sleep(c.timeBetweenSteps),
+
 		// Altera o diretório de download
 		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
 			WithDownloadPath(c.output).
@@ -118,8 +123,8 @@ func (c crawler) abreCaixaDialogo(ctx context.Context, tipo string) error {
 // exportaPlanilha clica no botão correto para exportar para excel, espera um tempo para download renomeia o arquivo.
 func (c crawler) exportaPlanilha(ctx context.Context, fName string) error {
 	chromedp.Run(ctx,
-		// Clica no botão de download 
-		chromedp.Click(`/html/body/table/tbody/tr[4]/td[1]/div[1]/div[2]/div/div[2]/div[2]/div/div[1]/input`, chromedp.BySearch, chromedp.NodeVisible),
+		// Clica no botão de download
+		chromedp.Click(`//*[@id="simpleExportDataDialogokButton"]/input`, chromedp.BySearch, chromedp.NodeVisible),
 	)
 
 	// Espera o download terminar
@@ -132,7 +137,7 @@ func (c crawler) exportaPlanilha(ctx context.Context, fName string) error {
 		}
 	})
 	<-done
-	
+
 	if err := nomeiaDownload(c.output, fName); err != nil {
 		return fmt.Errorf("erro renomeando arquivo (%s): %v", fName, err)
 	}
