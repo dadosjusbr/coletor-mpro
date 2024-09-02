@@ -6,10 +6,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/chromedp"
+	"github.com/dadosjusbr/status"
 )
 
 type crawler struct {
@@ -48,26 +50,26 @@ func (c crawler) crawl() ([]string, error) {
 	// Contracheque
 	log.Printf("Realizando seleção (%s/%s)...", c.month, c.year)
 	if err := c.abreCaixaDialogo(ctx, "contra"); err != nil {
-		log.Fatalf("Erro no setup:%v", err)
+		status.ExitFromError(err)
 	}
 	log.Printf("Seleção realizada com sucesso!\n")
 	cqFname := c.downloadFilePath("contracheque")
 	log.Printf("Fazendo download do contracheque (%s)...", cqFname)
 	if err := c.exportaPlanilha(ctx, cqFname); err != nil {
-		log.Fatalf("Erro fazendo download do contracheque: %v", err)
+		status.ExitFromError(err)
 	}
 	log.Printf("Download realizado com sucesso!\n")
 
 	// Indenizações
 	log.Printf("Realizando seleção (%s/%s)...", c.month, c.year)
 	if err := c.abreCaixaDialogo(ctx, "inde"); err != nil {
-		log.Fatalf("Erro no setup:%v", err)
+		status.ExitFromError(err)
 	}
 	log.Printf("Seleção realizada com sucesso!\n")
 	iFname := c.downloadFilePath("verbas-indenizatorias")
 	log.Printf("Fazendo download das indenizações (%s)...", iFname)
 	if err := c.exportaPlanilha(ctx, iFname); err != nil {
-		log.Fatalf("Erro fazendo download dos indenizações: %v", err)
+		status.ExitFromError(err)
 	}
 	log.Printf("Download realizado com sucesso!\n")
 
@@ -97,7 +99,7 @@ func (c crawler) abreCaixaDialogo(ctx context.Context, tipo string) error {
 		concatenated = fmt.Sprintf("%s%s%s", baseURL, c.year, c.month)
 	}
 
-	return chromedp.Run(ctx,
+	if err := chromedp.Run(ctx,
 		chromedp.Navigate(concatenated),
 		chromedp.Sleep(c.timeBetweenSteps),
 
@@ -117,7 +119,14 @@ func (c crawler) abreCaixaDialogo(ctx context.Context, tipo string) error {
 		browser.SetDownloadBehavior(browser.SetDownloadBehaviorBehaviorAllowAndName).
 			WithDownloadPath(c.output).
 			WithEventsEnabled(true),
-	)
+	); err != nil {
+		if strings.Contains(err.Error(), "could not set value on node") {
+			return status.NewError(status.DataUnavailable, err)
+		} else {
+			return status.NewError(status.Unknown, err)
+		}
+	}
+	return nil
 }
 
 // exportaPlanilha clica no botão correto para exportar para excel, espera um tempo para download renomeia o arquivo.
@@ -139,10 +148,10 @@ func (c crawler) exportaPlanilha(ctx context.Context, fName string) error {
 	<-done
 
 	if err := nomeiaDownload(c.output, fName); err != nil {
-		return fmt.Errorf("erro renomeando arquivo (%s): %v", fName, err)
+		return status.NewError(status.SystemError, fmt.Errorf("erro renomeando arquivo (%s): %v", fName, err))
 	}
 	if _, err := os.Stat(fName); os.IsNotExist(err) {
-		return fmt.Errorf("download do arquivo de %s não realizado", fName)
+		return status.NewError(status.SystemError, fmt.Errorf("download do arquivo de %s não realizado", fName))
 	}
 	return nil
 }
@@ -153,7 +162,7 @@ func nomeiaDownload(output, fName string) error {
 	// Identifica qual foi o ultimo arquivo
 	files, err := os.ReadDir(output)
 	if err != nil {
-		return fmt.Errorf("erro lendo diretório %s: %v", output, err)
+		return status.NewError(status.SystemError, fmt.Errorf("erro lendo diretório %s: %v", output, err))
 	}
 	var newestFPath string
 	var newestTime int64 = 0
@@ -161,7 +170,7 @@ func nomeiaDownload(output, fName string) error {
 		fPath := filepath.Join(output, f.Name())
 		fi, err := os.Stat(fPath)
 		if err != nil {
-			return fmt.Errorf("erro obtendo informações sobre arquivo %s: %v", fPath, err)
+			return status.NewError(status.SystemError, fmt.Errorf("erro obtendo informações sobre arquivo %s: %v", fPath, err))
 		}
 		currTime := fi.ModTime().Unix()
 		if currTime > newestTime {
@@ -171,7 +180,7 @@ func nomeiaDownload(output, fName string) error {
 	}
 	// Renomeia o ultimo arquivo modificado.
 	if err := os.Rename(newestFPath, fName); err != nil {
-		return fmt.Errorf("erro renomeando último arquivo modificado (%s)->(%s): %v", newestFPath, fName, err)
+		return status.NewError(status.SystemError, fmt.Errorf("erro renomeando último arquivo modificado (%s)->(%s): %v", newestFPath, fName, err))
 	}
 	return nil
 }
