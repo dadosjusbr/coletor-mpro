@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dadosjusbr/status"
 )
 
 type confSpec struct {
@@ -14,18 +15,18 @@ type confSpec struct {
 }
 
 const (
-	defaultGeneralTimeout      = 4 * time.Minute  // Duração máxima total da coleta de todos os arquivos. Valor padrão calculado a partir de uma média de execuções ~4.5min
-	defaulTimeBetweenSteps     = 15 * time.Second //Tempo de espera entre passos do coletor."
+	defaultGeneralTimeout  = 4 * time.Minute  // Duração máxima total da coleta de todos os arquivos. Valor padrão calculado a partir de uma média de execuções ~4.5min
+	defaulTimeBetweenSteps = 15 * time.Second //Tempo de espera entre passos do coletor."
 )
 
 func main() {
 	if _, err := strconv.Atoi(os.Getenv("MONTH")); err != nil {
-		log.Fatalf("Invalid month (\"%s\"): %q", os.Getenv("MONTH"), err)
+		status.ExitFromError(status.NewError(status.InvalidParameters, fmt.Errorf("invalid month (\"%s\"): %q", os.Getenv("MONTH"), err)))
 	}
 	month := os.Getenv("MONTH")
 
 	if _, err := strconv.Atoi(os.Getenv("YEAR")); err != nil {
-		log.Fatalf("Invalid year (\"%s\"): %q", os.Getenv("YEAR"), err)
+		status.ExitFromError(status.NewError(status.InvalidParameters, fmt.Errorf("invalid year (\"%s\"): %q", os.Getenv("YEAR"), err)))
 	}
 	year := os.Getenv("YEAR")
 
@@ -35,7 +36,7 @@ func main() {
 	}
 
 	if err := os.Mkdir(outputFolder, os.ModePerm); err != nil && !os.IsExist(err) {
-		log.Fatalf("Error creating output folder(%s): %q", outputFolder, err)
+		status.ExitFromError(status.NewError(status.InvalidParameters, fmt.Errorf("error creating output folder(%s): %q", outputFolder, err)))
 	}
 
 	generalTimeout := defaultGeneralTimeout
@@ -43,7 +44,7 @@ func main() {
 		var err error
 		generalTimeout, err = time.ParseDuration(os.Getenv("GENERAL_TIMEOUT"))
 		if err != nil {
-			log.Fatalf("Invalid GENERAL_TIMEOUT (\"%s\"): %q", os.Getenv("GENERAL_TIMEOUT"), err)
+			status.ExitFromError(status.NewError(status.InvalidParameters, fmt.Errorf("invalid GENERAL_TIMEOUT (\"%s\"): %q", os.Getenv("GENERAL_TIMEOUT"), err)))
 		}
 	}
 
@@ -52,7 +53,7 @@ func main() {
 		var err error
 		timeBetweenSteps, err = time.ParseDuration(os.Getenv("TIME_BETWEEN_STEPS"))
 		if err != nil {
-			log.Fatalf("Invalid TIME_BETWEEN_STEPS (\"%s\"): %q", os.Getenv("TIME_BETWEEN_STEPS"), err)
+			status.ExitFromError(status.NewError(status.InvalidParameters, fmt.Errorf("invalid TIME_BETWEEN_STEPS (\"%s\"): %q", os.Getenv("TIME_BETWEEN_STEPS"), err)))
 		}
 	}
 	c := crawler{
@@ -64,7 +65,7 @@ func main() {
 	}
 	downloads, err := c.crawl()
 	if err != nil {
-		log.Fatalf("Error crawling (%s, %s, %s): %v", year, month, outputFolder, err)
+		status.ExitFromError(status.NewError(status.OutputError, fmt.Errorf("error crawling (%s, %s, %s): %v", year, month, outputFolder, err)))
 	}
 
 	// O parser do MPRO espera os arquivos separados por \n. Mudanças aqui tem que
